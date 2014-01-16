@@ -6,6 +6,7 @@ import android.content.DialogInterface;
 import android.content.DialogInterface.OnClickListener;
 import android.content.DialogInterface.OnDismissListener;
 import android.content.SharedPreferences;
+import android.content.res.Resources;
 import android.os.Bundle;
 import android.os.Handler;
 import android.preference.PreferenceManager;
@@ -24,6 +25,7 @@ import android.widget.ListView;
 import android.widget.TextView;
 
 public class IITC_NavigationHelper extends ActionBarDrawerToggle implements OnItemClickListener {
+
     // Show/hide the up arrow on the very left
     // getActionBar().setDisplayHomeAsUpEnabled(enabled);
 
@@ -36,11 +38,6 @@ public class IITC_NavigationHelper extends ActionBarDrawerToggle implements OnIt
     // Makes the icon/title clickable
     // getActionBar().setHomeButtonEnabled(enabled);
 
-    public static final int NOTICE_HOWTO = 1 << 0;
-    public static final int NOTICE_INFO = 1 << 1;
-    public static final int NOTICE_PANES = 1 << 2;
-    // next one would be 1<<2; (this results in 1,2,4,8,...)
-
     private final IITC_Mobile mIitc;
     private final ActionBar mActionBar;
     private final SharedPreferences mPrefs;
@@ -48,12 +45,11 @@ public class IITC_NavigationHelper extends ActionBarDrawerToggle implements OnIt
     private final DrawerLayout mDrawerLayout;
     private final ListView mDrawerLeft;
     private final View mDrawerRight;
+    private final IITC_NotificationHelper mNotificationHelper;
 
     private boolean mDesktopMode = false;
-    private boolean mIsLoading;
     private Pane mPane = Pane.MAP;
     private String mHighlighter = null;
-    private int mDialogs = 0;
 
     public IITC_NavigationHelper(IITC_Mobile activity, ActionBar bar) {
         super(activity, (DrawerLayout) activity.findViewById(R.id.drawer_layout),
@@ -74,63 +70,11 @@ public class IITC_NavigationHelper extends ActionBarDrawerToggle implements OnIt
         mDrawerLeft.setOnItemClickListener(this);
         mDrawerLeft.setItemChecked(0, true);
         mDrawerLayout.setDrawerListener(this);
+        mNotificationHelper = new IITC_NotificationHelper(mIitc);
 
         onPrefChanged(); // also calls updateActionBar()
 
-        showNotice(NOTICE_HOWTO);
-    }
-
-    private void showNotice(final int which) {
-        if ((mPrefs.getInt("pref_messages", 0) & which) != 0 || (mDialogs & which) != 0) return;
-
-        int text;
-        switch (which) {
-            case NOTICE_HOWTO:
-                text = R.string.notice_how_to;
-                break;
-            case NOTICE_INFO:
-                text = R.string.notice_info;
-                break;
-            case NOTICE_PANES:
-                text = R.string.notice_panes;
-                break;
-            default:
-                return;
-        }
-
-        final View content = mIitc.getLayoutInflater().inflate(R.layout.dialog_notice, null);
-        TextView message = (TextView) content.findViewById(R.id.tv_notice);
-        message.setText(Html.fromHtml(mIitc.getString(text)));
-        message.setMovementMethod(LinkMovementMethod.getInstance());
-
-        AlertDialog dialog = new AlertDialog.Builder(mIitc)
-                .setView(content)
-                .setCancelable(true)
-                .setPositiveButton(android.R.string.ok, new OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.cancel();
-                    }
-                })
-                .create();
-        dialog.setOnDismissListener(new OnDismissListener() {
-            @Override
-            public void onDismiss(DialogInterface dialog) {
-                mDialogs &= ~which;
-                if (((CheckBox) content.findViewById(R.id.cb_do_not_show_again)).isChecked()) {
-                    int value = mPrefs.getInt("pref_messages", 0);
-                    value |= which;
-
-                    mPrefs
-                            .edit()
-                            .putInt("pref_messages", value)
-                            .commit();
-                }
-            }
-        });
-
-        mDialogs |= which;
-        dialog.show();
+        mNotificationHelper.showNotice(IITC_NotificationHelper.NOTICE_HOWTO);
     }
 
     private void updateViews() {
@@ -149,7 +93,7 @@ public class IITC_NavigationHelper extends ActionBarDrawerToggle implements OnIt
             mDrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_UNLOCKED, mDrawerRight);
             setDrawerIndicatorEnabled(false);
         } else {
-            if (mIsLoading) {
+            if (mIitc.isLoading()) {
                 mActionBar.setDisplayHomeAsUpEnabled(false); // Hide "up" indicator
                 mActionBar.setHomeButtonEnabled(false);// Make icon unclickable
                 mDrawerLayout.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED);
@@ -166,7 +110,7 @@ public class IITC_NavigationHelper extends ActionBarDrawerToggle implements OnIt
                 }
             }
 
-            if (mDrawerLayout.isDrawerOpen(mDrawerLeft)) {
+            if (mDrawerLayout.isDrawerOpen(mDrawerLeft) || mPane == Pane.MAP) {
                 mActionBar.setTitle(mIitc.getString(R.string.app_name));
             } else {
                 mActionBar.setTitle(mPane.label);
@@ -174,7 +118,7 @@ public class IITC_NavigationHelper extends ActionBarDrawerToggle implements OnIt
         }
 
         boolean mapVisible = mDesktopMode || mPane == Pane.MAP;
-        if ("No Highlights".equals(mHighlighter) || isDrawerOpened() || mIsLoading || !mapVisible) {
+        if ("No Highlights".equals(mHighlighter) || isDrawerOpened() || mIitc.isLoading() || !mapVisible) {
             mActionBar.setSubtitle(null);
         } else {
             mActionBar.setSubtitle(mHighlighter);
@@ -182,9 +126,18 @@ public class IITC_NavigationHelper extends ActionBarDrawerToggle implements OnIt
     }
 
     public void addPane(String name, String label, String icon) {
-        showNotice(NOTICE_PANES);
+        mNotificationHelper.showNotice(IITC_NotificationHelper.NOTICE_PANES);
 
-        int resId = mIitc.getResources().getIdentifier(icon, "drawable", mIitc.getPackageName());
+        Resources res = mIitc.getResources();
+        String packageName = res.getResourcePackageName(R.string.app_name);
+        /*
+         * since the package name is overridden in test builds
+         * we can't use context.getPackageName() to get the package name
+         * because the resources were processed before the package name was finally updated.
+         * so we have to retrieve the package name of another resource with Resources.getResourcePackageName()
+         * see http://www.piwai.info/renaming-android-manifest-package/
+         */
+        int resId = mIitc.getResources().getIdentifier(icon, "drawable", packageName);
         mNavigationAdapter.add(new Pane(name, label, resId));
     }
 
@@ -239,10 +192,14 @@ public class IITC_NavigationHelper extends ActionBarDrawerToggle implements OnIt
         mIitc.switchToPane(item);
 
         if (item == Pane.INFO) {
-            showNotice(NOTICE_INFO);
+            mNotificationHelper.showNotice(IITC_NotificationHelper.NOTICE_INFO);
         }
 
         mDrawerLayout.closeDrawer(mDrawerLeft);
+    }
+
+    public void onLoadingStateChanged() {
+        updateViews();
     }
 
     @Override
@@ -285,11 +242,6 @@ public class IITC_NavigationHelper extends ActionBarDrawerToggle implements OnIt
         updateViews();
     }
 
-    public void setLoadingState(boolean isLoading) {
-        mIsLoading = isLoading;
-        updateViews();
-    }
-
     public void showActionBar() {
         mActionBar.show();
     }
@@ -328,20 +280,15 @@ public class IITC_NavigationHelper extends ActionBarDrawerToggle implements OnIt
             add(Pane.COMPACT);
             add(Pane.PUBLIC);
             add(Pane.FACTION);
-
-            if (mPrefs.getBoolean("pref_advanced_menu", false)) {
-                add(Pane.DEBUG);
-            }
         }
     }
 
     public static class Pane {
         public static final Pane COMPACT = new Pane("compact", "Compact", R.drawable.ic_action_view_as_list_compact);
-        public static final Pane DEBUG = new Pane("debug", "Debug", R.drawable.ic_action_error);
         public static final Pane FACTION = new Pane("faction", "Faction", R.drawable.ic_action_cc_bcc);
         public static final Pane FULL = new Pane("full", "Full", R.drawable.ic_action_view_as_list);
         public static final Pane INFO = new Pane("info", "Info", R.drawable.ic_action_about);
-        public static final Pane MAP = new Pane("map", "IITC Mobile", R.drawable.ic_action_map);
+        public static final Pane MAP = new Pane("map", "Map", R.drawable.ic_action_map);
         public static final Pane PUBLIC = new Pane("public", "Public", R.drawable.ic_action_group);
 
         private int icon;

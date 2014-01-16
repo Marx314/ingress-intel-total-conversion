@@ -1,5 +1,49 @@
 <h2>News</h2>
 
+<h4>13th January 2014</h4>
+<p>
+A new IITC release, 0.16.2 and IITC Mobile 0.10.2 have been released. These are needed to work with a change to the
+standard intel site.
+</p>
+<p>
+Additionally, the 'Compute AP Statistics' plugin has been brought back, the 'blank map' base layer has a new black option
+to go with the white, and the 'Yandex' base map has had some bug fixes. Also, IITC Mobile features some changes to
+the 'show my location' feature. You may need to turn this option on again for it to work.
+</p>
+<p>
+<b>Update 14th January 2014</b>: An updated IITC Mobile, 0.10.3, has been released, to fix a crash issue seen by some.
+Also, a minor update was made to the main IITC script which changes the order the data is loaded, to match a change made to
+the standard intel site.
+</p>
+
+
+<h4>21st December 2013</h4>
+<p>
+Just in time for the holidays, another IITC update. IITC 0.16.1 and IITC Mobile 0.10.1 have just been released.
+Changes include
+</p>
+<ul>
+<li>Portals list plugin returns - but less data than before due to the Niantic backend changes</li>
+<li>Resonators plugin returns - but only shows the selected portal</li>
+<li>Mobile:
+ <ul>
+ <li>Some plugins moved to panes from the left-swipe menu: portals list, portal counts</li>
+ <li>Immersive fullscreen mode on Android 4.4 KitKat</li>
+ <li>Sort apps in share activity - most used at the top</li>
+ <li>Fix links sometimes being badly drawn on mobile</li>
+ </ul>
+</li>
+<li>.. and, as always, other various bug fixes, improvements, etc</li>
+</ul>
+
+<h4>6th December 2013</h3>
+<p>
+Niantic have just released a minor update to the standard intel site. Good news - recent IITC changes have made it
+successfully detect the protocol changes in most cases, so no update is needed. You may need to reload the page,
+and for IITC Mobile you may need to change a cache setting. See 
+<a href="https://plus.google.com/105383756361375410867/posts/1yTb59HGDm3">this G+ post</a> for more details.
+</p>
+
 <h4>2nd December 2013</h3>
 <p>
 IITC 0.16.0 and IITC Mobile 0.10.0 have been released. This update is required to work with the latest changes to

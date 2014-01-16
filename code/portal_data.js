@@ -22,18 +22,8 @@ window.getPortalLinks = function(guid) {
 }
 
 window.getPortalLinksCount = function(guid) {
-  var count = 0;
-  $.each(window.links, function(g,l) {
-    var d = l.options.data;
-    if (d.oGuid == guid) {
-      count++;
-    }
-    if (d.dGuid == guid) {
-      count++;
-    }
-  });
-
-  return count;
+  var links = getPortalLinks(guid);
+  return links.in.length+links.out.length;
 }
 
 
@@ -66,6 +56,11 @@ window.getPortalFieldsCount = function(guid) {
   });
 
   return count;
+}
+
+window.getPortalFieldsCount = function(guid) {
+  var fields = getPortalFields(guid);
+  return fields.length;
 }
 
 
@@ -106,37 +101,4 @@ window.findPortalLatLng = function(guid) {
 
   // no luck finding portal lat/lng
   return undefined;
-}
-
-window.getApGainDefending = function(guid) {
-  var d = window.getPortalByGuid(guid);
-  var resoCount = d.options.data.resCount;
-
-  var deployCount = 8 - resoCount;
-  var completionAp = (deployCount > 0) ? COMPLETION_BONUS : 0;
-  var friendlyAp = deployCount * DEPLOY_RESONATOR + completionAp;
-  return friendlyAp;
-}
-
-window.getApGainAttacking = function(guid) {
-  var d = window.getPortalByGuid(guid);
-  var resoCount = d.options.data.resCount;
-  var linkCount = window.getPortalLinksCount(guid);
-  var fieldCount = window.getPortalFieldsCount(guid);
-
-  var resoAp = resoCount * DESTROY_RESONATOR;
-  var linkAp = linkCount * DESTROY_LINK;
-  var fieldAp = fieldCount * DESTROY_FIELD;
-  var destroyAp = resoAp + linkAp + fieldAp;
-  var captureAp = CAPTURE_PORTAL + 8 * DEPLOY_RESONATOR + COMPLETION_BONUS;
-  var enemyAp = destroyAp + captureAp;
-  return enemyAp;
-}
-
-window.getPortalByGuid = function(guid) {
-  if(guid in window.portals) {
-    return window.portals[guid];
-  }
-
-  return false;
 }

@@ -13,46 +13,39 @@ offers many more features. It is available for
 
 <h3>Latest news</h3>
 
-<h4>2nd December 2013</h3>
+<h4>13th January 2014</h4>
 <p>
-IITC 0.16.0 and IITC Mobile 0.10.0 have been released. This update is required to work with the latest changes to
-the standard intel site. This update took a fair amount of work due to major changes
-in the network protocol used behind the standard intel website, hence the longer than usual delay for the update.
+A new IITC release, 0.16.2 and IITC Mobile 0.10.2 have been released. These are needed to work with a change to the
+standard intel site.
 </p>
 <p>
-As well as IITC itself, nearly every single plugin broke in some way due to these changes. Due to the amount of work
-needed to get everything possible working again, some plugins have been disabled for now. You can see the list of these
-disabled plugins in the download list - they're in the 'Deleted' category with a description of 'PLUGIN CURRENTLY UNAVAILABLE'.
+Additionally, the 'Compute AP Statistics' plugin has been brought back, the 'blank map' base layer has a new black option
+to go with the white, and the 'Yandex' base map has had some bug fixes. Also, IITC Mobile features some changes to
+the 'show my location' feature. You may need to turn this option on again for it to work.
 </p>
 <p>
-Shortly after the Niantic changes that broke IITC, there were reports of IITC users being banned. This seemed strange at
-first, as IITC was not even functioning at this time, so why would people be using it and getting banned. The conclusion
-that was reached was that a few people who tried to use the broken IITC Mobile app triggered either a bug in IITC that
-caused excessive requests, or triggered some kind of alert in the intel servers. Changes have been made to IITC now
-so this unlikely to be an issue again.
+<b>Update 14th January 2014</b>: An updated IITC Mobile, 0.10.3, has been released, to fix a crash issue seen by some.
+Also, a minor update was made to the main IITC script which changes the order the data is loaded, to match a change made to
+the standard intel site.
 </p>
 
-<h4>27th November 2013</h4>
+<h4>21st December 2013</h4>
 <p>
-IITC and IITC Mobile are currently broken, due to changes made to the standard intel website. This is a major change in how
-portal details are sent, with most of the extra data that the standard site didn't use being removed.
+Just in time for the holidays, another IITC update. IITC 0.16.1 and IITC Mobile 0.10.1 have just been released.
+Changes include
 </p>
-<p>
-This is not something simple to fix, and will take some time. Also, it severely cripples what IITC can do, as using this
-extra data, not displayed by the standard site, was its big feature.
-</p>
-<p>
-We will look into what can be done to get it working again, but it will take some time. Many plugins won't be practical 
-as the data will not be available.
-</p>
-<p>
-More details, and discussion, available in the
-<a href="https://plus.google.com/105383756361375410867/posts/E65qngRjR2T">Google+ post</a>.
-</p>
-<p>
-<b>Update</b> I've created a 'dummy' version of the desktop plugin that will, for now, disable IITC if you leave it installed.
-This is shown as version 0.15.99. When a fixed build is released, it will be 0.16.something and will update and start working.
-Test versions remain, but broken. Please join the Google+ Community where announcements will be made.
-</p>
+<ul>
+<li>Portals list plugin returns - but less data than before due to the Niantic backend changes</li>
+<li>Resonators plugin returns - but only shows the selected portal</li>
+<li>Mobile:
+ <ul>
+ <li>Some plugins moved to panes from the left-swipe menu: portals list, portal counts</li>
+ <li>Immersive fullscreen mode on Android 4.4 KitKat</li>
+ <li>Sort apps in share activity - most used at the top</li>
+ <li>Fix links sometimes being badly drawn on mobile</li>
+ </ul>
+</li>
+<li>.. and, as always, other various bug fixes, improvements, etc</li>
+</ul>
 
-<a class="btn btn-small" href="?page=news">Older news</a>
+<a class="btn btn-default btn-sm" href="?page=news">Older news</a>

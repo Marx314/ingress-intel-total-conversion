@@ -6,7 +6,6 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.preference.PreferenceActivity;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
@@ -48,11 +47,15 @@ public class IITC_PluginPreferenceActivity extends PreferenceActivity {
     public void onBuildHeaders(List<Header> target) {
         getActionBar().setDisplayHomeAsUpEnabled(true);
 
+        // notify about external plugins
+        IITC_NotificationHelper nh = new IITC_NotificationHelper(this);
+        nh.showNotice(IITC_NotificationHelper.NOTICE_EXTPLUGINS);
+
         mHeaders = target;
         // since the plugins container is static,
         // it is enough to parse the plugin only on first start.
         if (sPlugins == null) {
-            Log.d("iitcm", "opened plugin prefs the first time since app start -> parse plugins");
+            Log.d("opened plugin prefs the first time since app start -> parse plugins");
             sPlugins = new TreeMap<String, ArrayList<IITC_PluginPreference>>();
             setUpPluginPreferenceScreen();
         } else {
@@ -63,11 +66,12 @@ public class IITC_PluginPreferenceActivity extends PreferenceActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
         if (onIsMultiPane()) {
             getIntent()
                     .putExtra(PreferenceActivity.EXTRA_SHOW_FRAGMENT, PluginsFragment.class.getName());
         }
-        super.onCreate(savedInstanceState);
     }
 
     @Override
@@ -121,7 +125,7 @@ public class IITC_PluginPreferenceActivity extends PreferenceActivity {
             asset_array = am.list("plugins");
         } catch (IOException e) {
             // TODO Auto-generated catch block
-            e.printStackTrace();
+            Log.w(e);
         }
         if (asset_array == null) {
             asset_array = new String[0];
@@ -148,7 +152,7 @@ public class IITC_PluginPreferenceActivity extends PreferenceActivity {
             numPlugins += entry.getValue().size();
         }
         if ((user.length + official.length) != (numPlugins + mDeletedPlugins)) {
-            Log.d("iitcm", "new or less plugins found since last start, rebuild preferences");
+            Log.d("new or less plugins found since last start, rebuild preferences");
             sPlugins.clear();
             setUpPluginPreferenceScreen();
         }
@@ -157,24 +161,22 @@ public class IITC_PluginPreferenceActivity extends PreferenceActivity {
     void setUpPluginPreferenceScreen() {
 
         // get all plugins from asset manager
-        String[] asset_array = getAssetPlugins();
+        String[] assets = getAssetPlugins();
 
-        for (String anAsset_array : asset_array) {
+        for (String asset : assets) {
             // find user plugin name for user readable entries
             Scanner s = null;
             String src = "";
             try {
-                s = new Scanner(getAssets().open("plugins/" + anAsset_array))
-                        .useDelimiter("\\A");
-            } catch (IOException e2) {
-                // TODO Auto-generated catch block
-                e2.printStackTrace();
+                s = new Scanner(getAssets().open("plugins/" + asset)).useDelimiter("\\A");
+            } catch (IOException e) {
+                Log.w(e);
             }
             if (s != null) {
                 src = s.hasNext() ? s.next() : "";
             }
             // now we have all stuff together and can build the pref screen
-            addPluginPreference(src, anAsset_array, false);
+            addPluginPreference(src, asset, false);
         }
 
         // load user plugins from <storage-path>/IITC_Mobile/plugins/
@@ -185,8 +187,8 @@ public class IITC_PluginPreferenceActivity extends PreferenceActivity {
             try {
                 s = new Scanner(file).useDelimiter("\\A");
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
-                Log.d("iitcm", "failed to parse file " + file);
+                Log.w(e);
+                Log.d("failed to parse file " + file);
             }
             if (s != null) {
                 src = s.hasNext() ? s.next() : "";
@@ -201,7 +203,7 @@ public class IITC_PluginPreferenceActivity extends PreferenceActivity {
 
         // parse plugin name, description and category
         // we need default versions here otherwise iitcm may crash
-        HashMap<String,String> info = IITC_WebViewClient.getScriptInfo(src);
+        HashMap<String, String> info = IITC_FileManager.getScriptInfo(src);
         String plugin_name = info.get("name");
         String plugin_cat = info.get("category");
         String plugin_desc = info.get("description");
@@ -215,8 +217,8 @@ public class IITC_PluginPreferenceActivity extends PreferenceActivity {
             plugin_cat = USER_PLUGIN + plugin_cat;
         }
 
-        // do not add deleted plugins
-        if (plugin_cat.equals("Deleted")) {
+        // do not add deleted or stock map plugins
+        if (plugin_cat.equals("Deleted") || plugin_cat.equals("Stock")) {
             mDeletedPlugins++;
             return;
         }
@@ -225,7 +227,7 @@ public class IITC_PluginPreferenceActivity extends PreferenceActivity {
         // first check if we need a new category
         if (!sPlugins.containsKey(plugin_cat)) {
             sPlugins.put(plugin_cat, new ArrayList<IITC_PluginPreference>());
-            Log.d("iitcm", "create " + plugin_cat + " and add " + plugin_name);
+            Log.d("create " + plugin_cat + " and add " + plugin_name);
         }
 
         // now build a new checkable preference for the plugin
