@@ -158,19 +158,17 @@ From here you can remove/disable individual plugins or IITC itself.
 END
 ),
 
-'mobile-plugins' => Array ( "IITC Mobile: Is it possible to add other plugins to IITC Mobile?",
+'mobile-plugins' => Array ( "IITC Mobile: Is it possible to add external plugins to IITC Mobile?",
 <<<'END'
 Yes it is!
 <ul>
-<li>Create a folder named "IITC_Mobile" in your home directory.</li>
-<li>Inside this folder, create a new folder named "plugins".</li>
-<li>Copy all your additional plugins to this folder.</li>
-<li>You should see your plugins listed above the official plugins.</li>
+<li>Navigate to the IITC Plugins preference screen and click the (+) icon at the top right. You can select the script using a file explorer of your choice.</li>
+<li>IITCm creates a new folder in your home directory, named "IITC_Mobile". Inside this folder you'll find a "plugins" folder where all external plugins are copied to.</li>
 </ul>
 Note:
 <ul>
 <li>The filename has to end with *.user.js.</li>
-<li>If you don't know where to find your home directory: Enable dev-mode in the settings and follow the hint.</li>
+<li>You can also trigger installation by clicking on http(s) links pointing to a plugin, selecting plugins with a file explorer, opening javascript e-mail attachments etc...
 </ul>
 END
 ),
@@ -188,7 +186,7 @@ connected to WiFi. If you still want to prefetch tiles, go on reading:
   <li>A custom build including MapQuest tiles as default can be found <a href="http://iitcm.code-noobs.org/jTileDownloader-0-6-1-iitc.jar">here</a></li>
   </ul>
 <li>The easiest way is choosing a Bounding Box (Lat/Lon) via the Slippy Map chooser</li>
-<li>On your smartphone, search for your providers tile directory. Mapquest should be in <home directory>/Android/data/com.cradle.iitc_mobile/tiles/mpcdn.com/1.0.0/map/</li>
+<li>On your smartphone, search for your providers tile directory. Mapquest should be in &lsaquo;home directory&rsaquo;/Android/data/com.cradle.iitc_mobile/tiles/mpcdn.com/1.0.0/map/</li>
 <li>Finally, copy the content of JTileDownloaders output folder to the appropriate directory on your smartphone</li>
 </ul>
 END
