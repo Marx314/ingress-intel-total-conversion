@@ -35,7 +35,7 @@ window.artifact.requestData = function() {
   if (isIdle()) {
     artifact.idle = true;
   } else {
-    window.postAjax('getArtifactInfo', {}, artifact.handleSuccess, artifact.handleError);
+    window.postAjax('artifacts', {}, artifact.handleSuccess, artifact.handleError);
   }
 }
 
@@ -67,13 +67,15 @@ window.artifact.processData = function(data) {
 
   if (data.error || !data.artifacts) {
     console.warn('Failed to find artifacts in artifact response');
+    return;
   }
 
   artifact.clearData();
 
   $.each (data.artifacts, function(i,artData) {
-    if (artData.artifactId != 'jarvis') {
-      // jarvis artifacts - fragmentInfos and targetInfos
+    // if we have no descriptions for a type, we don't know about it
+    if (!artifact.getArtifactDescriptions(artData.artifactId)) {
+      // jarvis and amar artifacts - fragmentInfos and targetInfos
       // (future types? completely unknown at this time!)
       console.warn('Note: unknown artifactId '+artData.artifactId+' - guessing how to handle it');
     }
@@ -139,6 +141,16 @@ window.artifact.getArtifactTypes = function() {
 
 window.artifact.isArtifact = function(type) {
   return type in artifact.artifactTypes;
+}
+
+window.artifact.getArtifactDescriptions = function(type) {
+  var descriptions = {
+    'jarvis': { 'title': "Jarvis Shards", 'fragmentName': "shards" },
+    'amar': { 'title': "Amar Artifacts", 'fragmentName': "artifacts" },
+    'helios': { 'title': "Helios Artifacts", 'fragmentName': "artifacts" },
+  };
+
+  return descriptions[type];
 }
 
 // used to render portals that would otherwise be below the visible level
@@ -213,6 +225,20 @@ window.artifact.updateLayer = function() {
 
     }
 
+    // 2014-08-09 - helios artifacts. original guess was slightly wrong
+    if (data.helios) {
+      if (data.helios.target) {
+        // target portal - show the target marker. helios target marker doesn't fill like the earlier jarvis/amar targets
+        iconUrl = '//commondatastorage.googleapis.com/ingress.com/img/map_icons/marker_images/helios_shard_target.png';
+        iconSize = 100/2; // 100 pixels - half that size works better
+      } else if (data.helios.fragments) {
+        iconUrl = '//commondatastorage.googleapis.com/ingress.com/img/map_icons/marker_images/helios_shard.png';
+        iconSize = 60/2; // 60 pixels - half that size works better
+        opacity = 0.6; // these often hide portals - let's make them semi transparent
+      }
+
+    }
+
     if (iconUrl) {
       var icon = L.icon({
         iconUrl: iconUrl,
@@ -233,18 +259,16 @@ window.artifact.updateLayer = function() {
 
 
 window.artifact.showArtifactList = function() {
-
-
   var html = '';
-
-  var typeNames = { 'jarvis': 'Jarvis Shards', 'amar': 'Amar Artifacts' };
 
   if (Object.keys(artifact.artifactTypes).length == 0) {
     html += '<i>No artifacts at this time</i>';
   }
 
   $.each(artifact.artifactTypes, function(type,type2) {
-    var name = typeNames[type] || ('New artifact type: '+type);
+    var description = artifact.getArtifactDescriptions(type);
+
+    var name = description ? description.title : ('unknown artifact type: '+type);
 
     html += '<hr><div><b>'+name+'</b></div>';
 
@@ -273,7 +297,8 @@ window.artifact.showArtifactList = function() {
           if (data[type].target) {
             row += '<br>';
           }
-          row += '<span class="fragments'+(data[type].target?' '+TEAM_TO_CSS[data[type].target]:'')+'">Shard: #'+data[type].fragments.join(', #')+'</span> ';
+          var fragmentName = description ? description.fragmentName : 'fragment';
+          row += '<span class="fragments'+(data[type].target?' '+TEAM_TO_CSS[data[type].target]:'')+'">'+fragmentName+': #'+data[type].fragments.join(', #')+'</span> ';
           sortVal = Math.min.apply(null, data[type].fragments); // use min shard number at portal as sort key
         }
 

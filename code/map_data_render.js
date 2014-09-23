@@ -7,21 +7,19 @@ window.Render = function() {
 
   // when there are lots of portals close together, we only add some of them to the map
   // the idea is to keep the impression of the dense set of portals, without rendering them all
-  this.CLUSTER_SIZE = L.Browser.mobile ? 10 : 4;  // the map is divided into squares of this size in pixels for clustering purposes. mobile uses larger markers, so therefore larger clustering areas
+  this.CLUSTER_SIZE = L.Browser.mobile ? 16 : 8;  // the map is divided into squares of this size in pixels for clustering purposes. mobile uses larger markers, so therefore larger clustering areas
   this.CLUSTER_PORTAL_LIMIT = 4; // no more than this many portals are drawn in each cluster square
 
   // link length, in pixels, to be visible. use the portal cluster size, as shorter than this is likely hidden
   // under the portals
   this.LINK_VISIBLE_PIXEL_LENGTH = this.CLUSTER_SIZE;
 
-  this.entityVisibilityZoom = undefined;
-
   this.portalMarkerScale = undefined;
 }
 
 
 // start a render pass. called as we start to make the batch of data requests to the servers
-window.Render.prototype.startRenderPass = function() {
+window.Render.prototype.startRenderPass = function(level,bounds) {
   this.isRendering = true;
 
   this.deletedGuid = {};  // object - represents the set of all deleted game entity GUIDs seen in a render pass
@@ -29,6 +27,16 @@ window.Render.prototype.startRenderPass = function() {
   this.seenPortalsGuid = {};
   this.seenLinksGuid = {};
   this.seenFieldsGuid = {};
+
+  this.bounds = bounds;
+
+  this.clearPortalsBelowLevel(level);
+
+  this.resetPortalClusters();
+  this.resetLinkVisibility();
+
+  this.rescalePortalMarkers();
+
 }
 
 window.Render.prototype.clearPortalsBelowLevel = function(level) {
@@ -43,40 +51,6 @@ window.Render.prototype.clearPortalsBelowLevel = function(level) {
   }
   console.log('Render: deleted '+count+' portals by level');
 }
-
-window.Render.prototype.clearEntitiesOutsideBounds = function(bounds) {
-  var pcount=0, lcount=0, fcount=0;
-
-  for (var guid in window.portals) {
-    var p = portals[guid];
-    if (!bounds.contains (p.getLatLng()) && guid !== selectedPortal && !artifact.isInterestingPortal(guid)) {
-      this.deletePortalEntity(guid);
-      pcount++;
-    }
-  }
-
-  for (var guid in window.links) {
-    var l = links[guid];
-    if (!bounds.intersects (l.getBounds())) {
-      this.deleteLinkEntity(guid);
-      lcount++;
-    }
-  }
-
-  for (var guid in window.fields) {
-    var f = fields[guid];
-    if (!bounds.intersects (f.getBounds())) {
-      this.deleteFieldEntity(guid);
-      fcount++;
-    }
-  }
-  console.log('Render: deleted '+pcount+' portals, '+lcount+' links, '+fcount+' fields by bounds check');
-}
-
-// TODO? as well as clearing portals by level, and clearing entities outside the bounds...
-// can we clear unneeded 'fake' links after zooming out? based on the portals no longer being available to construct
-// the data? (not *required* - as they'll be removed in the endRenderPass code - but clearing things earlier rather than
-// later is preferred, if possible)
 
 
 // process deleted entity list and entity data
@@ -167,6 +141,11 @@ window.Render.prototype.endRenderPass = function() {
   this.bringPortalsToFront();
 
   this.isRendering = false;
+
+  // re-select the selected portal, to re-render the side-bar. ensures that any data calculated from the map data is up to date
+  if (selectedPortal) {
+    renderPortalDetails (selectedPortal);
+  }
 }
 
 window.Render.prototype.bringPortalsToFront = function() {
@@ -278,6 +257,8 @@ window.Render.prototype.createPortalEntity = function(ent) {
     timestamp: ent[1],
     data: ent[2]
   };
+
+  window.pushPortalGuidPositionCache(ent[0], ent[2].latE6, ent[2].lngE6);
 
   var marker = createMarker(latlng, dataOptions);
 
@@ -399,7 +380,6 @@ window.Render.prototype.createLinkEntity = function(ent,faked) {
   window.links[ent[0]] = poly;
 
   // only add the link to the layer if it's long enough to be seen
-
   if (this.linkVisible(poly)) {
     linksFactionLayers[poly.options.team].addLayer(poly);
   }
@@ -407,21 +387,15 @@ window.Render.prototype.createLinkEntity = function(ent,faked) {
 
 
 
-window.Render.prototype.updateEntityVisibility = function() {
-  if (this.entityVisibilityZoom === undefined || this.entityVisibilityZoom != map.getZoom()) {
-    this.entityVisibilityZoom = map.getZoom();
+window.Render.prototype.rescalePortalMarkers = function() {
+  if (this.portalMarkerScale === undefined || this.portalMarkerScale != portalMarkerScale()) {
+    this.portalMarkerScale = portalMarkerScale();
 
-    this.resetPortalClusters();
-    this.resetLinkVisibility();
+    console.log('Render: map zoom '+map.getZoom()+' changes portal scale to '+portalMarkerScale()+' - redrawing all portals');
 
-    if (this.portalMarkerScale === undefined || this.portalMarkerScale != portalMarkerScale()) {
-      this.portalMarkerScale = portalMarkerScale();
-
-      console.log('Render: map zoom '+map.getZoom()+' changes portal scale to '+portalMarkerScale()+' - redrawing all portals');
-
-      //NOTE: we're not calling this because it resets highlights - we're calling it as it resets the style (inc size) of all portal markers
-      resetHighlightedPortals();
-    }
+    //NOTE: we're not calling this because it resets highlights - we're calling it as it
+    // resets the style (inc size) of all portal markers, applying the new scale
+    resetHighlightedPortals();
   }
 }
 
@@ -459,7 +433,7 @@ window.Render.prototype.resetPortalClusters = function() {
       var guid = c[i];
       var p = window.portals[guid];
       var layerGroup = portalsFactionLayers[parseInt(p.options.level)][p.options.team];
-      if (i<this.CLUSTER_PORTAL_LIMIT || p.options.guid == selectedPortal || artifact.isInterestingPortal(p.options.guid)) {
+      if ((i<this.CLUSTER_PORTAL_LIMIT || p.options.guid == selectedPortal || artifact.isInterestingPortal(p.options.guid)) && this.bounds.contains(p.getLatLng())) {
         if (!layerGroup.hasLayer(p)) {
           layerGroup.addLayer(p);
         }
@@ -486,7 +460,9 @@ window.Render.prototype.addPortalToMapLayer = function(portal) {
   // however, it won't make a lot of visible difference compared to just pushing to the end of the list, then
   // adding to the visible layer if the list is below the limit
   if (this.portalClusters[cid].length < this.CLUSTER_PORTAL_LIMIT || portal.options.guid == selectedPortal || artifact.isInterestingPortal(portal.options.guid)) {
-    portalsFactionLayers[parseInt(portal.options.level)][portal.options.team].addLayer(portal);
+    if (this.bounds.contains(portal.getLatLng())) {
+      portalsFactionLayers[parseInt(portal.options.level)][portal.options.team].addLayer(portal);
+    }
   }
 }
 
@@ -502,7 +478,7 @@ window.Render.prototype.removePortalFromMapLayer = function(portal) {
     var index = this.portalClusters[cid].indexOf(portal.options.guid);
     if (index >= 0) {
       this.portalClusters[cid].splice(index,1);
-      // FIXME? if this portal was in on the screen (in the first 10), and we still have 10+ portals, add the new 10to to the screen?
+      // FIXME? if this portal was in on the screen (in the first 10), and we still have 10+ portals, add the new 10th to the screen?
     }
   }
 }
@@ -519,35 +495,16 @@ window.Render.prototype.getPortalClusterID = function(portal) {
 }
 
 
-// link length
-
-window.Render.prototype.getLinkPixelLength = function(link) {
-  var z = map.getZoom();
-
-  var latLngs = link.getLatLngs();
-  if (latLngs.length != 2) {
-    console.warn ('Link had '+latLngs.length+' points - expected 2!');
-    return undefined;
-  }
-
-  var point0 = map.project(latLngs[0]);
-  var point1 = map.project(latLngs[1]);
-
-  var dx = point0.x - point1.x;
-  var dy = point0.y - point1.y;
-
-  var lengthSquared = (dx*dx)+(dy*dy);
-
-  var length = Math.sqrt (lengthSquared);
-
-  return length;
-}
-
 
 window.Render.prototype.linkVisible = function(link) {
-  var length = this.getLinkPixelLength (link);
 
-  return length >= this.LINK_VISIBLE_PIXEL_LENGTH;
+  if (!this.bounds.intersects(link.getBounds())) {
+    return false;
+  }
+
+  var lengthSquared = this.getLinkPixelLengthSquared (link);
+
+  return lengthSquared >= this.LINK_VISIBLE_PIXEL_LENGTH*this.LINK_VISIBLE_PIXEL_LENGTH;
 }
 
 
@@ -564,4 +521,25 @@ window.Render.prototype.resetLinkVisibility = function() {
       if (linksFactionLayers[link.options.team].hasLayer(link)) linksFactionLayers[link.options.team].removeLayer(link);
     }
   }
+}
+
+
+window.Render.prototype.getLinkPixelLengthSquared = function(link) {
+  var z = map.getZoom();
+
+  var latLngs = link.getLatLngs();
+  if (latLngs.length != 2) {
+    console.warn ('Link had '+latLngs.length+' points - expected 2!');
+    return undefined;
+  }
+
+  var point0 = map.project(latLngs[0]);
+  var point1 = map.project(latLngs[1]);
+
+  var dx = point0.x - point1.x;
+  var dy = point0.y - point1.y;
+
+  var lengthSquared = (dx*dx)+(dy*dy);
+
+  return lengthSquared;
 }

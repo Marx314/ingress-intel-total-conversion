@@ -41,9 +41,7 @@ window.chat._oldBBox = null;
 window.chat.genPostData = function(isFaction, storageHash, getOlderMsgs) {
   if(typeof isFaction !== 'boolean') throw('Need to know if public or faction chat.');
 
-  // get window bounds, and extend to the minimum chat radius
-  chat._localRangeCircle.setLatLng(map.getCenter());
-  var b = map.getBounds().extend(chat._localRangeCircle.getBounds());
+  var b = clampLatLngBounds(map.getBounds());
 
   // set a current bounding box if none set so far
   if (!chat._oldBBox) chat._oldBBox = b;
@@ -74,14 +72,14 @@ window.chat.genPostData = function(isFaction, storageHash, getOlderMsgs) {
   var ne = b.getNorthEast();
   var sw = b.getSouthWest();
   var data = {
-    desiredNumItems: isFaction ? CHAT_FACTION_ITEMS : CHAT_PUBLIC_ITEMS ,
+//    desiredNumItems: isFaction ? CHAT_FACTION_ITEMS : CHAT_PUBLIC_ITEMS ,
     minLatE6: Math.round(sw.lat*1E6),
     minLngE6: Math.round(sw.lng*1E6),
     maxLatE6: Math.round(ne.lat*1E6),
     maxLngE6: Math.round(ne.lng*1E6),
     minTimestampMs: -1,
     maxTimestampMs: -1,
-    chatTab: isFaction ? 'faction' : 'all'
+    tab: isFaction ? 'faction' : 'all'
   }
 
   if(getOlderMsgs) {
@@ -127,15 +125,13 @@ window.chat.requestFaction = function(getOlderMsgs, isRetry) {
 
   var d = chat.genPostData(true, chat._faction, getOlderMsgs);
   var r = window.postAjax(
-    'getPaginatedPlexts',
+    'getPlexts',
     d,
     function(data, textStatus, jqXHR) { chat.handleFaction(data, getOlderMsgs); },
     isRetry
       ? function() { window.chat._requestFactionRunning = false; }
       : function() { window.chat.requestFaction(getOlderMsgs, true) }
   );
-
-  requests.add(r);
 }
 
 
@@ -143,12 +139,12 @@ window.chat._faction = {data:{}, oldestTimestamp:-1, newestTimestamp:-1};
 window.chat.handleFaction = function(data, olderMsgs) {
   chat._requestFactionRunning = false;
 
-  if(!data || !data.result) {
+  if(!data || !data.success) {
     window.failedRequestCount++;
     return console.warn('faction chat error. Waiting for next auto-refresh.');
   }
 
-  if(data.result.length === 0) return;
+  if(data.success.length === 0) return;
 
   var old = chat._faction.oldestTimestamp;
   chat.writeDataToHash(data, chat._faction, false, olderMsgs);
@@ -158,7 +154,7 @@ window.chat.handleFaction = function(data, olderMsgs) {
 
   window.chat.renderFaction(oldMsgsWereAdded);
 
-  if(data.result.length >= CHAT_FACTION_ITEMS) chat.needMoreMessages();
+  if(data.success.length >= CHAT_FACTION_ITEMS) chat.needMoreMessages();
 }
 
 window.chat.renderFaction = function(oldMsgsWereAdded) {
@@ -178,27 +174,25 @@ window.chat.requestPublic = function(getOlderMsgs, isRetry) {
 
   var d = chat.genPostData(false, chat._public, getOlderMsgs);
   var r = window.postAjax(
-    'getPaginatedPlexts',
+    'getPlexts',
     d,
     function(data, textStatus, jqXHR) { chat.handlePublic(data, getOlderMsgs); },
     isRetry
       ? function() { window.chat._requestPublicRunning = false; }
       : function() { window.chat.requestPublic(getOlderMsgs, true) }
   );
-
-  requests.add(r);
 }
 
 window.chat._public = {data:{}, oldestTimestamp:-1, newestTimestamp:-1};
 window.chat.handlePublic = function(data, olderMsgs) {
   chat._requestPublicRunning = false;
 
-  if(!data || !data.result) {
+  if(!data || !data.success) {
     window.failedRequestCount++;
     return console.warn('public chat error. Waiting for next auto-refresh.');
   }
 
-  if(data.result.length === 0) return;
+  if(data.success.length === 0) return;
 
   var old = chat._public.oldestTimestamp;
   chat.writeDataToHash(data, chat._public, true, olderMsgs);
@@ -212,7 +206,7 @@ window.chat.handlePublic = function(data, olderMsgs) {
     case 'full': window.chat.renderFull(oldMsgsWereAdded); break;
   }
 
-  if(data.result.length >= CHAT_PUBLIC_ITEMS) chat.needMoreMessages();
+  if(data.success.length >= CHAT_PUBLIC_ITEMS) chat.needMoreMessages();
 }
 
 window.chat.renderPublic = function(oldMsgsWereAdded) {
@@ -260,7 +254,7 @@ window.chat.nicknameClicked = function(event, nickname) {
 }
 
 window.chat.writeDataToHash = function(newData, storageHash, isPublicChannel, isOlderMsgs) {
-  $.each(newData.result, function(ind, json) {
+  $.each(newData.success, function(ind, json) {
     // avoid duplicates
     if(json[0] in storageHash.data) return true;
 
@@ -436,6 +430,13 @@ window.chat.getActive = function() {
   return $('#chatcontrols .active').text();
 }
 
+window.chat.tabToChannel = function(tab) {
+  if (tab == 'faction') return 'faction';
+  if (tab == 'alerts') return 'alerts';
+  return 'public'; //for 'full', 'compact' and 'public'
+};
+
+
 
 window.chat.toggle = function() {
   var c = $('#chat, #chatcontrols');
@@ -457,8 +458,14 @@ window.chat.toggle = function() {
 
 window.chat.request = function() {
   console.log('refreshing chat');
-  chat.requestFaction(false);
-  chat.requestPublic(false);
+  var tab = chat.getActive();
+//TODO: add 'alerts' tab, and add the matching case in here
+  if (tab == 'faction') {
+    chat.requestFaction(false);
+  } else {
+    // the 'public', 'full' and 'compact' tabs are all based off the 'public' COMM data
+    chat.requestPublic(false);
+  }
 }
 
 
@@ -481,9 +488,13 @@ window.chat.needMoreMessages = function() {
     chat.requestFaction(true);
   else
     chat.requestPublic(true);
-}
+};
+
 
 window.chat.chooseAnchor = function(t) {
+  var oldTab = chat.getActive();
+  var oldChannel = chat.tabToChannel(oldTab);
+
   var tt = t.text();
 
   localStorage['iitc-chat-tab'] = tt;
@@ -493,6 +504,9 @@ window.chat.chooseAnchor = function(t) {
 
   $('#chatcontrols .active').removeClass('active');
   $("#chatcontrols a:contains('" + tt + "')").addClass('active');
+
+  var newChannel = chat.tabToChannel(tt);
+  if (newChannel != oldChannel) setTimeout(chat.request,1);
 
   $('#chat > div').hide();
 
@@ -574,8 +588,6 @@ window.chat.keepScrollPosition = function(box, scrollBefore, isOldMsgs) {
 //
 
 window.chat.setup = function() {
-  window.chat._localRangeCircle =  L.circle(map.getCenter(), CHAT_MIN_RANGE*1000);
-
   if (localStorage['iitc-chat-tab']) {
     var t = $('<a>'+localStorage['iitc-chat-tab']+'</a>');
     window.chat.chooseAnchor(t);
@@ -696,7 +708,7 @@ window.chat.postMsg = function() {
   var data = {message: msg,
               latE6: Math.round(latlng.lat*1E6),
               lngE6: Math.round(latlng.lng*1E6),
-              chatTab: publik ? 'all' : 'faction'};
+              tab: publik ? 'all' : 'faction'};
 
   var errMsg = 'Your message could not be delivered. You can copy&' +
                'paste it here and try again if you want:\n\n' + msg;

@@ -11,28 +11,15 @@ window.updateGameScore = function(data) {
     return;
   }
 
-  // hacky - but here is as good as any for a location
-  // the niantic servers have attempted to obfuscate the client/server protocol, by munging the request parameters
-  // detecting which munge set should be used is tricky - even the stock site gets it wrong sometimes
-  // to detect the problem and try a different set is easiest in a place where there's only a single request of that type
-  // sent at once, and it has no extra parameters. this method matches those requirements
-  if (data.error || (data.indexOf && data.indexOf('"error"') != -1)) {
-    window.updateGameScoreFailCount++;
-    if (window.updateGameScoreFailCount <= window.requestParameterMunges.length) {
-//TODO: methods to try a different munge set?
-//      window.activeRequestMungeSet = (window.activeRequestMungeSet+1) % window.requestParameterMunges.length;
-//      console.warn('IITC munge issue - cycling to set '+window.activeRequestMungeSet);
-
-      updateGameScore();
-      return;
-    } else {
-      console.error('IITC munge issue - and retry limit reached. IITC will likely fail');
-    }
+  if (data && data.error) {
+    // TODO? better retry handling in here...
+    console.error('game score failed to load');
   }
 
   window.updateGameScoreFailCount = 0;
 
-  var r = parseInt(data.result.resistanceScore), e = parseInt(data.result.enlightenedScore);
+  var e = parseInt(data[0]); //enlightened score in data[0]
+  var r = parseInt(data[1]); //resistance score in data[1]
   var s = r+e;
   var rp = r/s*100, ep = e/s*100;
   r = digits(r), e = digits(e);
@@ -42,5 +29,6 @@ window.updateGameScore = function(data) {
   // help cursor via “#gamestat span”
   $('#gamestat').attr('title', 'Resistance:\t'+r+' MindUnits\nEnlightened:\t'+e+' MindUnits');
 
+  // TODO: idle handling - don't refresh when IITC is idle!
   window.setTimeout('window.updateGameScore', REFRESH_GAME_SCORE*1000);
 }

@@ -13,6 +13,8 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.content.res.Configuration;
+import android.graphics.Bitmap;
+import android.graphics.Bitmap.CompressFormat;
 import android.net.Uri;
 import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
@@ -30,28 +32,38 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.webkit.CookieManager;
 import android.webkit.WebView;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemLongClickListener;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ListView;
+import android.widget.PopupMenu;
 import android.widget.SearchView;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import com.cradle.iitc_mobile.IITC_NavigationHelper.Pane;
+import com.cradle.iitc_mobile.prefs.PluginPreferenceActivity;
+import com.cradle.iitc_mobile.prefs.PreferenceActivity;
+import com.cradle.iitc_mobile.share.ShareActivity;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Stack;
 import java.util.Vector;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class IITC_Mobile extends Activity
-        implements OnSharedPreferenceChangeListener, NfcAdapter.CreateNdefMessageCallback {
+        implements OnSharedPreferenceChangeListener, NfcAdapter.CreateNdefMessageCallback, OnItemLongClickListener {
     private static final String mIntelUrl = "https://www.ingress.com/intel";
 
     private SharedPreferences mSharedPrefs;
@@ -63,7 +75,7 @@ public class IITC_Mobile extends Activity
     private IITC_DeviceAccountLogin mLogin;
     private final Vector<ResponseHandler> mResponseHandlers = new Vector<ResponseHandler>();
     private boolean mDesktopMode = false;
-    private boolean mAdvancedMenu = false;
+    private Set<String> mAdvancedMenu;
     private MenuItem mSearchMenuItem;
     private View mImageLoading;
     private ListView mLvDebug;
@@ -74,6 +86,7 @@ public class IITC_Mobile extends Activity
     private boolean mReloadNeeded = false;
     private boolean mIsLoading = true;
     private boolean mShowMapInDebug = false;
+    private boolean mPersistentZoom = false;
     private final Stack<String> mDialogStack = new Stack<String>();
     private String mPermalink = null;
     private String mSearchTerm = null;
@@ -122,6 +135,7 @@ public class IITC_Mobile extends Activity
         });
 
         mLvDebug.setAdapter(new IITC_LogAdapter(this));
+        mLvDebug.setOnItemLongClickListener(this);
 
         // do something if user changed something in the settings
         mSharedPrefs = PreferenceManager.getDefaultSharedPreferences(this);
@@ -131,12 +145,17 @@ public class IITC_Mobile extends Activity
         mDesktopMode = mSharedPrefs.getBoolean("pref_force_desktop", false);
 
         // enable/disable advance menu
-        mAdvancedMenu = mSharedPrefs.getBoolean("pref_advanced_menu", false);
+        final String[] menuDefaults = getResources().getStringArray(R.array.pref_android_menu_default);
+        mAdvancedMenu = mSharedPrefs
+                .getStringSet("pref_android_menu", new HashSet<String>(Arrays.asList(menuDefaults)));
+
+        mPersistentZoom = mSharedPrefs.getBoolean("pref_persistent_zoom", false);
 
         // get fullscreen status from settings
         mIitcWebView.updateFullscreenStatus();
 
         mFileManager = new IITC_FileManager(this);
+        mFileManager.setUpdateInterval(Integer.parseInt(mSharedPrefs.getString("pref_update_plugins_interval", "7")));
 
         mUserLocation = new IITC_UserLocation(this);
         mUserLocation.setLocationMode(Integer.parseInt(mSharedPrefs.getString("pref_user_location_mode", "0")));
@@ -169,21 +188,35 @@ public class IITC_Mobile extends Activity
             if (mUserLocation.setLocationMode(mode))
                 mReloadNeeded = true;
             return;
+        } else if (key.equals("pref_persistent_zoom")) {
+            mPersistentZoom = mSharedPrefs.getBoolean("pref_persistent_zoom", false);
+            return;
         } else if (key.equals("pref_fullscreen")) {
             mIitcWebView.updateFullscreenStatus();
             mNavigationHelper.onPrefChanged();
             return;
-        } else if (key.equals("pref_advanced_menu")) {
-            mAdvancedMenu = sharedPreferences.getBoolean("pref_advanced_menu", false);
-            mNavigationHelper.setDebugMode(mAdvancedMenu);
+        } else if (key.equals("pref_android_menu")) {
+            final String[] menuDefaults = getResources().getStringArray(R.array.pref_android_menu_default);
+            mAdvancedMenu = mSharedPrefs.getStringSet("pref_android_menu",
+                    new HashSet<String>(Arrays.asList(menuDefaults)));
+            mNavigationHelper.setDebugMode(mAdvancedMenu.contains(R.string.menu_debug));
             invalidateOptionsMenu();
             // no reload needed
             return;
         } else if (key.equals("pref_fake_user_agent")) {
             mIitcWebView.setUserAgent();
+        } else if (key.equals("pref_last_plugin_update")) {
+            final Long forceUpdate = sharedPreferences.getLong("pref_last_plugin_update", 0);
+            if (forceUpdate == 0) mFileManager.updatePlugins(true);
+            return;
+        } else if (key.equals("pref_update_plugins_interval")) {
+            final int interval = Integer.parseInt(mSharedPrefs.getString("pref_update_plugins_interval", "7"));
+            mFileManager.setUpdateInterval(interval);
+            return;
         } else if (key.equals("pref_press_twice_to_exit")
                 || key.equals("pref_share_selected_tab")
                 || key.equals("pref_messages")
+                || key.equals("pref_secure_updates")
                 || key.equals("pref_external_storage")) {
             // no reload needed
             return;
@@ -238,7 +271,7 @@ public class IITC_Mobile extends Activity
             final String type = intent.getType() == null ? "" : intent.getType();
             final String path = uri.getPath() == null ? "" : uri.getPath();
             if (path.endsWith(".user.js") || type.contains("javascript")) {
-                final Intent prefIntent = new Intent(this, IITC_PluginPreferenceActivity.class);
+                final Intent prefIntent = new Intent(this, PluginPreferenceActivity.class);
                 prefIntent.setDataAndType(uri, intent.getType());
                 startActivity(prefIntent);
             }
@@ -342,7 +375,7 @@ public class IITC_Mobile extends Activity
             if (findViewById(R.id.imageLoading).getVisibility() == View.GONE) {
                 // enough idle...let's do some work
                 Log.d("resuming...reset idleTimer");
-                mIitcWebView.loadUrl("javascript: window.idleReset();");
+                mIitcWebView.loadJS("(function(){if(window.idleReset) window.idleReset();})();");
             }
         }
 
@@ -469,6 +502,7 @@ public class IITC_Mobile extends Activity
     }
 
     public void switchToPane(final Pane pane) {
+        if (mDesktopMode) return;
         mIitcWebView.loadUrl("javascript: window.show('" + pane.name + "');");
     }
 
@@ -494,18 +528,15 @@ public class IITC_Mobile extends Activity
 
         for (int i = 0; i < menu.size(); i++) {
             final MenuItem item = menu.getItem(i);
+            final boolean enabled = mAdvancedMenu.contains(item.getTitle());
 
             switch (item.getItemId()) {
                 case R.id.action_settings:
                     item.setVisible(true);
                     break;
 
-                case R.id.menu_clear_cookies:
-                    item.setVisible(mAdvancedMenu && visible);
-                    break;
-
                 case R.id.locate:
-                    item.setVisible(visible);
+                    item.setVisible(enabled && visible);
                     item.setEnabled(!mIsLoading);
                     item.setIcon(mUserLocation.isFollowing()
                             ? R.drawable.ic_action_location_follow
@@ -513,12 +544,12 @@ public class IITC_Mobile extends Activity
                     break;
 
                 case R.id.menu_debug:
-                    item.setVisible(mAdvancedMenu && visible);
+                    item.setVisible(enabled);
                     item.setChecked(mDebugging);
                     break;
 
                 default:
-                    item.setVisible(visible);
+                    item.setVisible(enabled && visible);
             }
         }
 
@@ -550,14 +581,15 @@ public class IITC_Mobile extends Activity
 
                 if (mUserLocation.hasCurrentLocation()) {
                     // if gps location is displayed we can use a better location without any costs
-                    mUserLocation.locate();
+                    mUserLocation.locate(mPersistentZoom);
                 } else {
                     // get location from network by default
-                    mIitcWebView.loadUrl("javascript: window.map.locate({setView : true});");
+                    mIitcWebView.loadUrl("javascript: window.map.locate({setView : true" +
+                            (mPersistentZoom ? ", maxZoom : map.getZoom()" : "") + "});");
                 }
                 return true;
             case R.id.action_settings: // start settings activity
-                final Intent intent = new Intent(this, IITC_PreferenceActivity.class);
+                final Intent intent = new Intent(this, PreferenceActivity.class);
                 try {
                     intent.putExtra("iitc_version", mFileManager.getIITCVersion());
                 } catch (final IOException e) {
@@ -569,6 +601,9 @@ public class IITC_Mobile extends Activity
             case R.id.menu_clear_cookies:
                 final CookieManager cm = CookieManager.getInstance();
                 cm.removeAllCookie();
+                return true;
+            case R.id.menu_send_screenshot:
+                sendScreenshot();
                 return true;
             case R.id.menu_debug:
                 mDebugging = !mDebugging;
@@ -588,29 +623,28 @@ public class IITC_Mobile extends Activity
     }
 
     public void reloadIITC() {
-        mNavigationHelper.reset();
-        mMapSettings.reset();
-        mUserLocation.reset();
-        mIitcWebView.getWebViewClient().reset();
-        mBackStack.clear();
-        // iitc starts on map after reload
-        mCurrentPane = Pane.MAP;
         loadUrl(mIntelUrl);
         mReloadNeeded = false;
     }
 
     // vp=f enables mDesktopMode mode...vp=m is the default mobile view
     private String addUrlParam(final String url) {
-        if (mDesktopMode) {
-            return (url + "?vp=f");
-        } else {
-            return (url + "?vp=m");
-        }
+        return url + (url.contains("?") ? '&' : '?') + "vp=" + (mDesktopMode ? 'f' : 'm');
+    }
+
+    public void reset() {
+        mNavigationHelper.reset();
+        mMapSettings.reset();
+        mUserLocation.reset();
+        mIitcWebView.getWebViewClient().reset();
+        mBackStack.clear();
+        mCurrentPane = Pane.MAP;
     }
 
     // inject the iitc-script and load the intel url
     // plugins are injected onPageFinished
     public void loadUrl(String url) {
+        reset();
         setLoadingState(true);
         url = addUrlParam(url);
         mIitcWebView.loadUrl(url);
@@ -693,6 +727,7 @@ public class IITC_Mobile extends Activity
         mNavigationHelper.onLoadingStateChanged();
         invalidateOptionsMenu();
         updateViews();
+        if (!isLoading) mFileManager.updatePlugins(false);
 
         if (mSearchTerm != null && !isLoading) {
             new Handler().postDelayed(new Runnable() {
@@ -771,6 +806,14 @@ public class IITC_Mobile extends Activity
         updateViews();
     }
 
+    /**
+     * onClick handler for R.id.btnClearLog, assigned in activity_main.xml
+     */
+    public void onClearLog(final View v)
+    {
+        ((IITC_LogAdapter) mLvDebug.getAdapter()).clear();
+    }
+
     private void deleteUpdateFile() {
         final File file = new File(getExternalFilesDir(null).toString() + "/iitcUpdate.apk");
         if (file != null) file.delete();
@@ -841,6 +884,40 @@ public class IITC_Mobile extends Activity
         mPermalink = href;
     }
 
+    private void sendScreenshot() {
+        Bitmap bitmap = mIitcWebView.getDrawingCache();
+        if (bitmap == null) {
+            mIitcWebView.buildDrawingCache();
+            bitmap = mIitcWebView.getDrawingCache();
+            if (bitmap == null) {
+                Log.e("could not get bitmap!");
+                return;
+            }
+            bitmap = Bitmap.createBitmap(bitmap);
+            if (!mIitcWebView.isDrawingCacheEnabled()) mIitcWebView.destroyDrawingCache();
+        }
+        else {
+            bitmap = Bitmap.createBitmap(bitmap);
+        }
+
+        try {
+            final File cache = getExternalCacheDir();
+            final File file = File.createTempFile("IITC screenshot", ".png", cache);
+            if (!bitmap.compress(CompressFormat.PNG, 100, new FileOutputStream(file))) {
+                // quality is ignored by PNG
+                throw new IOException("Could not compress bitmap!");
+            }
+            startActivityForResult(ShareActivity.forFile(this, file, "image/png"), new ResponseHandler() {
+                @Override
+                public void onActivityResult(final int resultCode, final Intent data) {
+                    file.delete();
+                }
+            });
+        } catch (final IOException e) {
+            Log.e("Could not generate screenshot", e);
+        }
+    }
+
     @Override
     public NdefMessage createNdefMessage(final NfcEvent event) {
         NdefRecord[] records;
@@ -855,5 +932,34 @@ public class IITC_Mobile extends Activity
             };
         }
         return new NdefMessage(records);
+    }
+
+    @Override
+    public boolean onItemLongClick(final AdapterView<?> parent, final View view, final int position, final long id) {
+        if (parent == mLvDebug) {
+            final IITC_LogAdapter adapter = ((IITC_LogAdapter) parent.getAdapter());
+            final Log.Message item = adapter.getItem(position);
+
+            final PopupMenu popupMenu = new PopupMenu(this, view);
+            popupMenu.getMenuInflater().inflate(R.menu.debug, popupMenu.getMenu());
+
+            popupMenu.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+                @Override
+                public boolean onMenuItemClick(final MenuItem menuitem) {
+                    switch (menuitem.getItemId()) {
+                        case R.id.menu_copy:
+                            mIitcWebView.getJSInterface().copy(item.toString());
+                            return true;
+                        case R.id.menu_delete:
+                            adapter.remove(item);
+                            return true;
+                    }
+                    return false;
+                }
+            });
+
+            popupMenu.show();
+        }
+        return false;
     }
 }

@@ -13,30 +13,18 @@ offers many more features. It is available for
 
 <h3>Latest news</h3>
 
-<h4>6th February 2014</h4>
+<h4>17th September 2014</h4>
 <p>
-IITC 0.16.4 and IITC Mobile 0.10.4 have just been released. This version is required to fix a bug with showing portal details
-due to a change made by Niantic to the intel site protocol. Also, the following changes have been made:
+IITC 0.18.0 and IITC Mobile 0.11.6 have just been released. This is an important update required to fix a few
+problems caused in recent Niantic site updates.
 </p>
+<p>Changes include:</p>
 <ul>
-<li>Portal markers are now reduced in size when you zoom out, reducing clutter when viewing large areas of the map</li>
-<li>Blocked a 3rd party plugin, arc, from running - it had spyware features hidden within it
-(<a href="https://plus.google.com/105383756361375410867/posts/4b2EjP3Du42">details here</a>).</li>
-<li>Plugins
- <ul>
- <li>add-kml: support for opening files on mobile added</li>
- <li>regions: new plugin to draw the scoreboard regions on the map. <i>No support for showing scores - this needs Niantic to add it to the standard intel site first</i></li>
- <li>score-cycle-times: new plugin to show the times of the scoreboard cycles</li>
- <li>draw-tools: added basic import/export (via copy+paste), and colour choosing options (click on "DrawTools Opt" in the sidebar)</li>
- <li>compute-ap-stats and portal-names: changed code to reduce the performance impact when a large number of portals are shown</li>
- </ul>
-</li>
-<li>Mobile:
- <ul>
- <li>NFC support for sharing map view/selected portal - app permissions updated for this</li>
- </ul>
-</li>
-<li>.. plus various minor bugfixes and improvements</li>
+<li>New plugin: layer count. Counts the number of overlapping layers on the map at the selected point</li>
+<li>Portals list plugin: A major update, including integration with the bookmarks and uniques plugins</li>
+<li>COMM bugfixes: only load the visible tab (in preperation for adding the 'alerts' tab), and fix COMM not loading on global map view</li>
+<li>plus other tweaks and bugfixes...</li>
 </ul>
+
 
 <a class="btn btn-default btn-sm" href="?page=news">Older news</a>

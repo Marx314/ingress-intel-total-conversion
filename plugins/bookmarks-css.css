@@ -1,3 +1,9 @@
+/* hide when printing */
+@media print {
+	#bkmrksTrigger { display: none !important; }
+}
+
+
 #bookmarksBox *{
 	display:block;
 	padding:0;
@@ -243,7 +249,7 @@
 	border-left-width:0;
 }
 #bkmrksTrigger{
-	display:block !important;
+	display:block;
 	position:absolute;
 	overflow:hidden;
 	top:0;
@@ -267,7 +273,16 @@
 #sidebar #portaldetails h3.title{
 	width:auto;
 }
-#bkmrksTrigger, .bkmrksStar span{
+.portal-list-bookmark span {
+	display:inline-block;
+	margin: -3px;
+	width:16px;
+	height:15px;
+	overflow:hidden;
+	background-repeat:no-repeat;
+	cursor:pointer;
+}
+#bkmrksTrigger, .bkmrksStar span, .portal-list-bookmark span {
 	background-image:url(@@INCLUDEIMAGE:plugins/bookmarks-img.png@@);
 }
 .bkmrksStar span{
@@ -282,7 +297,7 @@
 .bkmrksStar span, .bkmrksStar.favorite:focus span{
 	background-position:left top;
 }
-.bkmrksStar:focus span, .bkmrksStar.favorite span{
+.bkmrksStar:focus span, .bkmrksStar.favorite span, .portal-list-bookmark.favorite span{
 	background-position:right top;
 }
 #bookmarksBox .bookmarkList .bookmarkFolder{
@@ -438,16 +453,6 @@
 #bookmarksBox.mobile #topBar #bookmarksMin,
 #bookmarksBox.mobile #topBar .handle{
 	display:none !important;
-}
-
-#bookmarksBox.mobile #topBar #bookmarksDel{
-	width:100%;
-	height:34px !important;
-	font-size:13px;
-	color:#fff;
-	font-weight:normal;
-	padding-top:11px;
-	text-indent:0;
 }
 
 #bookmarksBox.mobile #bookmarksTypeBar h5{
@@ -664,4 +669,63 @@
 	width:96%;
 	height:120px;
 	resize:vertical;
+}
+
+
+/*--- Other Opt css ---*/
+#bookmarksBox.mobile a.bookmarksMoveIn{
+	display:none !important;
+}
+
+#bookmarksBox.mobile .bookmarkList ul li ul li.bkmrk a.bookmarksMoveIn{
+	background:none !important;
+	text-align:center;
+	color:#fff;
+	box-shadow: inset 0 1px 0 #20A8B1,inset -1px 0 0 #20A8B1 !important;
+	width:10%;
+}
+
+#bookmarksBox.mobile.moveMode a.bookmarksMoveIn{
+	display:block !important;
+}
+
+#bookmarksBox.moveMode ul .bookmarksLink,
+#bookmarksBox.moveMode ul .othersBookmarks .bookmarksLink{
+	width:90% !important;
+}
+.bookmarksDialog h3{
+	text-transform:capitalize;margin-top:10px;
+}
+.bookmarksDialog .bookmarkFolder{
+	margin-bottom:4px;
+	border:1px solid #20a8b1;
+	background:#069;
+	padding:4px 10px;
+	color:#fff;
+	cursor:pointer;
+}
+.bookmarksDialog .bookmarkFolder:hover{
+	text-decoration:underline;
+}
+
+#bookmarksBox.mobile #topBar .btn{
+	width:100%;height:45px !important;
+	font-size:13px;
+	color:#fff;
+	font-weight:normal;
+	padding-top:17px;
+	text-indent:0 !important;
+}
+#bookmarksBox.mobile .btn{
+	width:50% !important;
+	background:#222;
+}
+#bookmarksBox.mobile .btn.left{
+	border-right:1px solid #20a8b1 !important;
+}
+#bookmarksBox.mobile .btn#bookmarksMove{
+	background:#B42E2E;
+}
+#bkmrksSetbox{
+	text-align:center;
 }

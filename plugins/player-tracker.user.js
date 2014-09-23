@@ -2,7 +2,7 @@
 // @id             iitc-plugin-player-tracker@breunigs
 // @name           IITC Plugin: Player tracker
 // @category       Layer
-// @version        0.10.2.@@DATETIMEVERSION@@
+// @version        0.10.5.@@DATETIMEVERSION@@
 // @namespace      https://github.com/jonatkins/ingress-intel-total-conversion
 // @updateURL      @@UPDATEURL@@
 // @downloadURL    @@DOWNLOADURL@@
@@ -27,10 +27,6 @@ window.PLAYER_TRACKER_LINE_COLOUR = '#FF00FD';
 window.plugin.playerTracker = function() {};
 
 window.plugin.playerTracker.setup = function() {
-  try { console.log('Loading OverlappingMarkerSpiderfier JS now'); } catch(e) {}
-  @@INCLUDERAW:external/oms.min.js@@
-  try { console.log('done loading OverlappingMarkerSpiderfier JS'); } catch(e) {}
-
   var iconEnlImage = '@@INCLUDEIMAGE:images/marker-green.png@@';
   var iconEnlRetImage = '@@INCLUDEIMAGE:images/marker-green-2x.png@@';
   var iconResImage = '@@INCLUDEIMAGE:images/marker-blue.png@@';
@@ -62,22 +58,8 @@ window.plugin.playerTracker.setup = function() {
       });
     }
   });
-  plugin.playerTracker.oms = new OverlappingMarkerSpiderfier(map, {keepSpiderfied: true, legWeight: 3.5});
-  plugin.playerTracker.oms.legColors = {'usual': '#FFFF00', 'highlighted': '#FF0000'};
 
-  var playerPopup = new L.Popup({offset: L.point([1,-34])});
-  plugin.playerTracker.oms.addListener('click', function(player) {
-    window.renderPortalDetails(player.options.referenceToPortal);
-    if (player.options.desc) {
-      playerPopup.setContent(player.options.desc);
-      playerPopup.setLatLng(player.getLatLng());
-      map.openPopup(playerPopup);
-    }
-  });
-  plugin.playerTracker.oms.addListener('spiderfy', function(markers) {
-    map.closePopup();
-  });
-
+  plugin.playerTracker.playerPopup = new L.Popup({offset: L.point([1,-34])});
 
   addHook('publicChatDataAvailable', window.plugin.playerTracker.handleData);
 
@@ -90,6 +72,20 @@ window.plugin.playerTracker.setup = function() {
 }
 
 window.plugin.playerTracker.stored = {};
+
+plugin.playerTracker.onClickListener = function(event) {
+  var marker = event.target;
+
+  var ll = marker.options.referenceToPortal.split(",");
+  var guid = window.findPortalGuidByPositionE6(ll[0], ll[1]);
+  if(guid) window.renderPortalDetails(guid);
+
+  if (marker.options.desc) {
+    plugin.playerTracker.playerPopup.setContent(marker.options.desc);
+    plugin.playerTracker.playerPopup.setLatLng(marker.getLatLng());
+    map.openPopup(plugin.playerTracker.playerPopup);
+  }
+};
 
 // force close all open tooltips before markers are cleared
 window.plugin.playerTracker.closeIconTooltips = function() {
@@ -119,15 +115,15 @@ window.plugin.playerTracker.getLimit = function() {
 
 window.plugin.playerTracker.discardOldData = function() {
   var limit = plugin.playerTracker.getLimit();
-  $.each(plugin.playerTracker.stored, function(pguid, player) {
+  $.each(plugin.playerTracker.stored, function(plrname, player) {
     var i;
     var ev = player.events;
     for(i = 0; i < ev.length; i++) {
       if(ev[i].time >= limit) break;
     }
     if(i === 0) return true;
-    if(i === ev.length) return delete plugin.playerTracker.stored[pguid];
-    plugin.playerTracker.stored[pguid].events.splice(0, i);
+    if(i === ev.length) return delete plugin.playerTracker.stored[plrname];
+    plugin.playerTracker.stored[plrname].events.splice(0, i);
   });
 }
 
@@ -144,12 +140,12 @@ window.plugin.playerTracker.eventHasLatLng = function(ev, lat, lng) {
 
 window.plugin.playerTracker.processNewData = function(data) {
   var limit = plugin.playerTracker.getLimit();
-  $.each(data.raw.result, function(ind, json) {
+  $.each(data.raw.success, function(ind, json) {
     // skip old data
     if(json[1] < limit) return true;
 
     // find player and portal information
-    var pguid, lat, lng, guid, name, address;
+    var plrname, lat, lng, id=null, name, address;
     var skipThisMessage = false;
     $.each(json[2].plext.markup, function(ind, markup) {
       switch(markup[0]) {
@@ -165,14 +161,17 @@ window.plugin.playerTracker.processNewData = function(data) {
         }
         break;
       case 'PLAYER':
-        pguid = markup[1].plain;
+        plrname = markup[1].plain;
         break;
       case 'PORTAL':
         // link messages are “player linked X to Y” and the player is at
         // X.
         lat = lat ? lat : markup[1].latE6/1E6;
         lng = lng ? lng : markup[1].lngE6/1E6;
-        guid = guid ? guid : markup[1].guid;
+
+        // no GUID in the data any more - but we need some unique string. use the latE6,lngE6
+        id = markup[1].latE6+","+markup[1].lngE6;
+
         name = name ? name : markup[1].name;
         address = address ? address : markup[1].address;
         break;
@@ -180,23 +179,23 @@ window.plugin.playerTracker.processNewData = function(data) {
     });
 
     // skip unusable events
-    if(!pguid || !lat || !lng || !guid || skipThisMessage) return true;
+    if(!plrname || !lat || !lng || !id || skipThisMessage) return true;
 
     var newEvent = {
       latlngs: [[lat, lng]],
-      guids: [guid],
+      ids: [id],
       time: json[1],
       name: name,
       address: address
     };
 
-    var playerData = window.plugin.playerTracker.stored[pguid];
+    var playerData = window.plugin.playerTracker.stored[plrname];
 
     // short-path if this is a new player
     if(!playerData || playerData.events.length === 0) {
-      plugin.playerTracker.stored[pguid] = {
+      plugin.playerTracker.stored[plrname] = {
          // this always resolves, as the chat delivers this data
-        nick: pguid,
+        nick: plrname,
         team: json[2].plext.team,
         events: [newEvent]
       };
@@ -216,8 +215,8 @@ window.plugin.playerTracker.processNewData = function(data) {
     // this is multiple resos destroyed at the same time.
     if(evts[cmp].time === json[1]) {
       evts[cmp].latlngs.push([lat, lng]);
-      evts[cmp].guids.push(guid);
-      plugin.playerTracker.stored[pguid].events = evts;
+      evts[cmp].ids.push(id);
+      plugin.playerTracker.stored[plrname].events = evts;
       return true;
     }
 
@@ -242,7 +241,7 @@ window.plugin.playerTracker.processNewData = function(data) {
     }
 
     // update player data
-    plugin.playerTracker.stored[pguid].events = evts;
+    plugin.playerTracker.stored[plrname].events = evts;
   });
 }
 
@@ -279,9 +278,9 @@ window.plugin.playerTracker.drawData = function() {
 
   var split = PLAYER_TRACKER_MAX_TIME / 4;
   var now = new Date().getTime();
-  $.each(plugin.playerTracker.stored, function(pguid, playerData) {
+  $.each(plugin.playerTracker.stored, function(plrname, playerData) {
     if(!playerData || playerData.events.length === 0) {
-      console.warn('broken player data for pguid=' + pguid);
+      console.warn('broken player data for plrname=' + plrname);
       return true;
     }
 
@@ -317,7 +316,7 @@ window.plugin.playerTracker.drawData = function() {
       }
       popup += '<span style="font-weight:bold;margin-left:10px;">';
 
-      var playerLevelDetails = window.plugin.guessPlayerLevels.fetchLevelDetailsByPlayer(pguid);
+      var playerLevelDetails = window.plugin.guessPlayerLevels.fetchLevelDetailsByPlayer(plrname);
       if(playerLevelDetails.min == 8) {
         popup += 'Level ' + getLevel(8);
       } else {
@@ -350,15 +349,15 @@ window.plugin.playerTracker.drawData = function() {
     var eventPortal = []
     var closestPortal;
     var mostPortals = 0;
-    $.each(last.guids, function(i, guid) {
-      if(eventPortal[guid]) {
-        eventPortal[guid]++;
+    $.each(last.ids, function(i, id) {
+      if(eventPortal[id]) {
+        eventPortal[id]++;
       } else {
-        eventPortal[guid] = 1;
+        eventPortal[id] = 1;
       }
-      if(eventPortal[guid] > mostPortals) {
-        mostPortals = eventPortal[guid];
-        closestPortal = guid;
+      if(eventPortal[id] > mostPortals) {
+        mostPortals = eventPortal[id];
+        closestPortal = id;
       }
     });
 
@@ -371,6 +370,8 @@ window.plugin.playerTracker.drawData = function() {
 // as per OverlappingMarkerSpiderfier docs, click events (popups, etc) must be handled via it rather than the standard
 // marker click events. so store the popup text in the options, then display it in the oms click handler
     var m = L.marker(gllfe(last), {icon: icon, referenceToPortal: closestPortal, opacity: absOpacity, desc: popup, title: tooltip});
+    m.addEventListener('spiderfiedclick', plugin.playerTracker.onClickListener);
+
 //    m.bindPopup(title);
 
     if (tooltip) {
@@ -379,7 +380,7 @@ window.plugin.playerTracker.drawData = function() {
     }
 
     m.addTo(playerData.team === 'RESISTANCE' ? plugin.playerTracker.drawnTracesRes : plugin.playerTracker.drawnTracesEnl);
-    plugin.playerTracker.oms.addMarker(m);
+    window.registerMarkerForOMS(m);
 
     // jQueryUI doesn’t automatically notice the new markers
     if (!isTouchDev) {
@@ -399,7 +400,9 @@ window.plugin.playerTracker.drawData = function() {
       dashArray: "5,8"
     };
 
-    L.multiPolyline(polyLine, opts).addTo(plugin.playerTracker.drawnTracesEnl);
+    $.each(polyLine,function(ind,poly) {
+      L.polyline(poly, opts).addTo(plugin.playerTracker.drawnTracesEnl);
+    });
   });
   $.each(polyLineByAgeRes, function(i, polyLine) {
     if(polyLine.length === 0) return true;
@@ -412,7 +415,9 @@ window.plugin.playerTracker.drawData = function() {
       dashArray: "5,8"
     };
 
-    L.multiPolyline(polyLine, opts).addTo(plugin.playerTracker.drawnTracesRes);
+    $.each(polyLine, function(ind,poly) {
+      L.polyline(poly, opts).addTo(plugin.playerTracker.drawnTracesRes);
+    });
   });
 }
 
@@ -422,7 +427,7 @@ window.plugin.playerTracker.handleData = function(data) {
   plugin.playerTracker.discardOldData();
   plugin.playerTracker.processNewData(data);
   if (!window.isTouchDevice()) plugin.playerTracker.closeIconTooltips();
-  plugin.playerTracker.oms.clearMarkers();
+
   plugin.playerTracker.drawnTracesEnl.clearLayers();
   plugin.playerTracker.drawnTracesRes.clearLayers();
   plugin.playerTracker.drawData();
@@ -431,7 +436,7 @@ window.plugin.playerTracker.handleData = function(data) {
 window.plugin.playerTracker.findUserPosition = function(nick) {
   nick = nick.toLowerCase();
   var foundPlayerData = undefined;
-  $.each(plugin.playerTracker.stored, function(pguid, playerData) {
+  $.each(plugin.playerTracker.stored, function(plrname, playerData) {
     if (playerData.nick.toLowerCase() === nick) {
       foundPlayerData = playerData;
       return false;

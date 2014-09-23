@@ -1,5 +1,155 @@
 <h2>News</h2>
 
+<h4>17th September 2014</h4>
+<p>
+IITC 0.18.0 and IITC Mobile 0.11.6 have just been released. This is an important update required to fix a few
+problems caused in recent Niantic site updates.
+</p>
+<p>Changes include:</p>
+<ul>
+<li>New plugin: layer count. Counts the number of overlapping layers on the map at the selected point</li>
+<li>Portals list plugin: A major update, including integration with the bookmarks and uniques plugins</li>
+<li>COMM bugfixes: only load the visible tab (in preperation for adding the 'alerts' tab), and fix COMM not loading on global map view</li>
+<li>plus other tweaks and bugfixes...</li>
+</ul>
+
+<h4>15th August 2014</h4>
+<p>
+IITC 0.17.5 and IITC Mobile 0.11.5 have just been released. This is a critical update required to work
+with the latest changes to the standard intel site.
+</p>
+<p>
+Along with the fixes needed to work with the Niantic changes, the only other change since the previous
+release is a minor colour scheme change for mods, to match the standard intel site. Rare is now a
+shade of blue (rather than purple), and very rare is now purple (rather than pink).
+</p>
+
+<h4>14th August 2014</h4>
+<p>
+IITC 0.17.4 and IITC Mobile 0.11.4 have just been released. Changes include:
+</p>
+<ul>
+<li>Support for the Helios artifacts</li>
+<li>New plugin: 'uniques' - allows manual and partial automatic tracking of unique portals visited/captured</li>
+<li>Passcodes can be redeemed - enter them in the box below the portal details in the sidebar</li>
+<li>Big improvements in network error handling - including a new prompt when IITC needs a reload after a Niantic site update</li>
+<li>and, as usual, other tweaks and bugfixes</li>
+</ul>
+
+<h4>5th July 2014</h4>
+<p>
+IITC 0.17.3 and IITC Mobile 0.11.3 have just been released. Changes include:
+</p>
+<ul>
+<li>Leaflet updated: some bugfixes for the map engine IITC uses.</li>
+<li>Keyboard shortcuts: limited testing so far, so considered experimental. More details in 
+<a href="https://plus.google.com/116983602532788146323/posts/7omuVsv3c1g">this post</a>.</li>
+<li>New plugin "Cross Links". This works with the "draw tools" plugin, highlighting any existing links that cross
+drawn lines/polygons. Very useful to see what needs clearing when planning large fields.</li>
+<li>and, as always, other minor tweaks and bugfixes</li>
+</ul>
+
+<h4>16th June 2014</h4>
+<p>
+IITC 0.17.2 and IITC Mobile 0.11.2 have just been release. This is to fix the display of portal details - in particular,
+the 'owner' field - after Niantic removed the capture date from the standard site and data.
+</p>
+
+<h4>31st May 2014</h4>
+<p>
+IITC 0.17.1 and IITC Mobile 0.11.1 have just been released.
+</p>
+<p>
+Another critical update, due to more changes by Niantic. Hopefully the last one for a while - all recent breaking changes
+were caused by Niantic removing the obsfucation of data requests one bit at a time - the final piece has been removed now.
+</p>
+<p>
+<b>Lost bookmarks? Drawn items?</b> In the latest Niantic site update they changed the server to always go to the
+<code>http<b>s</b></code> version. It is possible to copy your data to the new location - further details
+<a href="https://plus.google.com/105383756361375410867/posts/749UX2nQcaP">here</a>.
+</p>
+<p>
+Additionally, a few bugs were fixed since the previous release, and now most map layers support zooming in closer than before.
+<b>Note</b>: There can be issues on Chrome when zooming beyond zoom level 18 (the previous default maximum for several maps).
+Just zoom out again if the zoom/layer controls, or the COMM panel, disappear.
+</p>
+
+<h4>24th May 2014</h4>
+<p>
+And another IITC update, IITC 0.16.12 and IITC Mobile 0.11.0 have just been released, to fix things after the most recent
+update to the standard intel site.
+</p>
+<p>
+Note that Niantich have trimmed down the data a bit more, removing things not used by the standard intel site. In particular,
+we no longer know the resonator deployment distance, the portal address, and the portal description.
+Due to this, the 'show-address' and 'draw-resonators' plugins are no longer available. 
+</p>
+
+<h4>17th May 2014</h4>
+<p>
+Yet another cricical IITC Update - IITC 0.16.11 and IITC Mobile 0.10.11 have just been released. This fixes the munge error at startup.
+</p>
+<p>
+<b>Note</b>: IITC 0.16.10 and IITC Mobile 0.10.10 were available for a few hours. This had a problem loading the portal details.
+</p>
+
+<h4>10th May 2014</h4>
+<p>
+Another critical IITC update - IITC 0.16.9 and IITC Mobile 0.10.9 have just been released. This fixes the munge error at startup.
+</p>
+<p>
+Also, the bookmarks plugin received an update. This has had minimal testing, so please report any issues.
+</p>
+
+<h4>6th May 2014</h4>
+<p>
+IITC 0.16.8 and IITC Mobile 0.10.8 have just been released. This is a critical update that is needed for IITC to correctly
+load the map data.
+</p>
+
+<h4>29th April 2014</h4>
+<p>
+IITC 0.16.7 and IITC Mobile 0.10.7 have been released, to fix things to work with the latest Niantic changes.
+</p>
+<p>
+There have also been a few tweaks to improve performance, and an optional alternative rendering mode
+that might give a good performance boost in some cases when there's lots of portals on screen.
+</p>
+
+<h4>14th March 2014</h4>
+<p>
+IITC 0.16.6 and IITC Mobile 0.10.6 have just been released. This is a critical update required to successfully load
+portals when zoomed in (L3+ or closer) to the map. Changes include:
+</p>
+<ul>
+<li>debug tiles fade for completed tiles</li>
+<li>warning in sidebar when standard layers are turned off</li>
+<li>player level: fixed AP values for L2/L3</li>
+<li>Plugins:
+<ul>
+<li>portal-counts: percentage in pie chart</li>
+<li>guess-player-levels: guess level based on portal attacks (attack range as calculated from log)</li>
+</ul></li>
+<li>Mobile:
+<ul>
+<li>send screenshot from menu</li>
+<li>fixed sharing interface (caused crash on some devices)</li>
+<li>show loading indicator while log is being loaded</li>
+<li>configurable menu</li>
+</ul></li>
+</ul>
+
+<h4>22nd February 2014</h4>
+<p>
+IITC 0.16.5 and IITC Mobile 0.10.5 have just been released. This version is required to work with a change made to the
+standard intel site. Also, the following changes have been made:
+</p>
+<ul>
+<li>The new Artifacts are now supported</li>
+<li>Bookmarks plugin updated</li>
+<li>Draw tools plugin: markers updated to also support colours</li>
+</ul>
+
 <h4>6th February 2014</h4>
 <p>
 IITC 0.16.4 and IITC Mobile 0.10.4 have just been released. This version is required to fix a bug with showing portal details

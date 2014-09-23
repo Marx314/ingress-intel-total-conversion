@@ -44,19 +44,6 @@ window.getPortalFields = function(guid) {
 
   return fields;
 }
-window.getPortalFieldsCount = function(guid) {
-  var count = 0;
-  $.each(window.fields, function(g,f) {
-    var d = f.options.data;
-    if ( d.points[0].guid == guid
-      || d.points[1].guid == guid
-      || d.points[2].guid == guid ) {
-        count++;
-    }
-  });
-
-  return count;
-}
 
 window.getPortalFieldsCount = function(guid) {
   var fields = getPortalFields(guid);
@@ -74,7 +61,7 @@ window.findPortalLatLng = function(guid) {
   // not found in portals - try the cached (and possibly stale) details - good enough for location
   var details = portalDetail.get(guid);
   if (details) {
-    return L.latLng (details.locationE6.latE6/1E6, details.locationE6.lngE6/1E6);
+    return L.latLng (details.latE6/1E6, details.lngE6/1E6);
   }
 
   // now try searching through fields
@@ -101,4 +88,98 @@ window.findPortalLatLng = function(guid) {
 
   // no luck finding portal lat/lng
   return undefined;
+};
+
+
+(function() {
+  var cache = {};
+  var GC_LIMIT = 5000; // run garbage collector when cache has more that 5000 items
+  var GC_KEEP  = 4000; // keep the 4000 most recent items
+
+  window.findPortalGuidByPositionE6 = function(latE6, lngE6) {
+    var item = cache[latE6+","+lngE6];
+    if(item) return item[0];
+
+    // now try searching through currently rendered portals
+    for(var guid in window.portals) {
+      var data = window.portals[guid].options.data;
+      if(data.latE6 == latE6 && data.lngE6 == lngE6) return guid;
+    }
+
+    // now try searching through fields
+    for(var fguid in window.fields) {
+      var points = window.fields[fguid].options.data.points;
+
+      for(var i in points) {
+        var point = points[i];
+        if(point.latE6 == latE6 && point.lngE6 == lngE6) return point.guid;
+      }
+    }
+
+    // and finally search through links
+    for(var lguid in window.links) {
+      var l = window.links[lguid].options.data;
+      if(l.oLatE6 == latE6 && l.oLngE6 == lngE6) return l.oGuid;
+      if(l.dLatE6 == latE6 && l.dLngE6 == lngE6) return l.dGuid;
+    }
+
+    return null;
+  };
+
+  window.pushPortalGuidPositionCache = function(guid, latE6, lngE6) {
+    cache[latE6+","+lngE6] = [guid, Date.now()];
+
+    if(Object.keys(cache).length > GC_LIMIT) {
+      Object.keys(cache) // get all latlngs
+        .map(function(latlng) { return [latlng, cache[latlng][1]]; })  // map them to [latlng, timestamp]
+        .sort(function(a,b) { return b[1] - a[1]; }) // sort them
+        .slice(GC_KEEP) // drop the MRU
+        .forEach(function(item) { delete cache[item[0]] }); // delete the rest
+    }
+  }
+})();
+
+
+// get the AP gains from a portal, based only on the brief summary data from portals, links and fields
+// not entirely accurate - but available for all portals on the screen
+window.getPortalApGain = function(guid) {
+
+  var p = window.portals[guid];
+  if (p) {
+    var data = p.options.data;
+
+    var linkCount = getPortalLinksCount(guid);
+    var fieldCount = getPortalFieldsCount(guid);
+
+    var result = portalApGainMaths(data.resCount, linkCount, fieldCount);
+    return result;
+  }
+
+  return undefined;
+}
+
+// given counts of resonators, links and fields, calculate the available AP
+// doesn't take account AP for resonator upgrades or AP for adding mods
+window.portalApGainMaths = function(resCount, linkCount, fieldCount) {
+
+  var deployAp = (8-resCount)*DEPLOY_RESONATOR;
+  if (resCount == 0) deployAp += CAPTURE_PORTAL;
+  if (resCount != 8) deployAp += COMPLETION_BONUS;
+  // there could also be AP for upgrading existing resonators, and for deploying mods - but we don't have data for that
+  var friendlyAp = deployAp;
+
+  var destroyResoAp = resCount*DESTROY_RESONATOR;
+  var destroyLinkAp = linkCount*DESTROY_LINK;
+  var destroyFieldAp = fieldCount*DESTROY_FIELD;
+  var captureAp = CAPTURE_PORTAL + 8 * DEPLOY_RESONATOR + COMPLETION_BONUS;
+  var destroyAp = destroyResoAp+destroyLinkAp+destroyFieldAp;
+  var enemyAp = destroyAp+captureAp;
+
+  return {
+    friendlyAp: friendlyAp,
+    enemyAp: enemyAp,
+    destroyAp: destroyAp,
+    destroyResoAp: destroyResoAp,
+    captureAp: captureAp
+  }
 }

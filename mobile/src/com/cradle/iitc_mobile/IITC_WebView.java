@@ -17,6 +17,7 @@ import android.widget.Toast;
 
 import com.cradle.iitc_mobile.async.CheckHttpResponse;
 
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -140,9 +141,18 @@ public class IITC_WebView extends WebView {
 
     @TargetApi(19)
     public void loadJS(final String js) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            evaluateJavascript(js, null);
-        } else {
+        boolean classicWebView = Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT;
+        if (!classicWebView) {
+            // some strange Android 4.4+ custom ROMs are using the classic webview
+            try {
+                evaluateJavascript(js, null);
+            } catch (final IllegalStateException e) {
+                Log.e(e);
+                Log.d("Classic WebView detected: use old injection method");
+                classicWebView = true;
+            }
+        }
+        if (classicWebView) {
             // if in edit text mode, don't load javascript otherwise the keyboard closes.
             final HitTestResult testResult = getHitTestResult();
             if (testResult != null && testResult.getType() == HitTestResult.EDIT_TEXT_TYPE) {
@@ -214,13 +224,11 @@ public class IITC_WebView extends WebView {
     }
 
     void updateFullscreenStatus() {
-        final Set<String> entries = mSharedPrefs.getStringSet("pref_fullscreen", new HashSet<String>());
+        final String[] fullscreenDefaults = getResources().getStringArray(R.array.pref_hide_fullscreen_defaults);
+        final Set<String> entries = mSharedPrefs.getStringSet("pref_fullscreen",
+                new HashSet<String>(Arrays.asList(fullscreenDefaults)));
         mFullscreenStatus &= FS_ENABLED;
 
-        // default values...android has no nice way to add default values to multiSelectListPreferences
-        if (entries.isEmpty()) {
-            mFullscreenStatus += FS_ACTIONBAR | FS_SYSBAR;
-        }
         for (final String entry : entries) {
             mFullscreenStatus += Integer.parseInt(entry);
         }
